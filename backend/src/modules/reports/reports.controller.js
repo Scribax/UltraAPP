@@ -12,8 +12,8 @@ const dashboard = async (req, res, next) => {
       db.query(
         `SELECT COUNT(*) as count, COALESCE(SUM(total),0) as revenue
          FROM sales WHERE business_id = $1 AND status = 'completed'
-         AND created_at >= NOW() AT TIME ZONE $2 - INTERVAL '1 day'
-         AND DATE(created_at AT TIME ZONE $2) = CURRENT_DATE AT TIME ZONE $2`,
+         AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2
+         AND created_at <  DATE_TRUNC('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2 + INTERVAL '1 day'`,
         [bizId, tz]
       ),
       // Productos con stock bajo
