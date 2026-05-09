@@ -16,6 +16,7 @@ const productSchema = z.object({
   max_stock: z.number().int().optional(),
   unit: z.string().default('unidad'),
   category_id: z.string().uuid().optional(),
+  image_url: z.string().url().optional().or(z.literal('')),
 });
 
 const list = async (req, res, next) => {
@@ -55,10 +56,10 @@ const create = async (req, res, next) => {
       }
     }
     const result = await db.query(
-      `INSERT INTO products (business_id, category_id, name, description, barcode, buy_price, sell_price, stock, min_stock, max_stock, unit)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      `INSERT INTO products (business_id, category_id, name, description, barcode, buy_price, sell_price, stock, min_stock, max_stock, unit, image_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
       [req.business.id, data.category_id, data.name, data.description, data.barcode,
-       data.buy_price, data.sell_price, data.stock, data.min_stock, data.max_stock, data.unit]
+       data.buy_price, data.sell_price, data.stock, data.min_stock, data.max_stock, data.unit, data.image_url]
     );
     await logAudit(req, 'product.created', 'product', result.rows[0].id, { name: data.name });
     res.status(201).json(result.rows[0]);
@@ -142,4 +143,14 @@ const importExcel = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { list, create, update, remove, getByBarcode, importExcel };
+const uploadImage = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se envió imagen' });
+    // Multer (diskStorage) guarda el archivo y nos da el filename.
+    // Devolvemos la ruta relativa que servirá el backend.
+    const url = `/uploads/${req.file.filename}`;
+    res.json({ url });
+  } catch (err) { next(err); }
+};
+
+module.exports = { list, create, update, remove, getByBarcode, importExcel, uploadImage };

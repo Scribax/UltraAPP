@@ -51,6 +51,15 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: false }));
 
+// ── Archivos estáticos ───────────────────────────────────────
+const path = require('path');
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 // ── Health check ───────────────────────────────────────────
 app.get('/health', async (req, res) => {
   const db = require('./config/db');

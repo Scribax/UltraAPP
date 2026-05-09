@@ -83,8 +83,8 @@ const list = async (req, res, next) => {
     const conditions = ['s.business_id = $1', "s.status = 'completed'"];
     const params = [req.business.id];
 
-    if (from) { conditions.push(`s.created_at >= $${params.length + 1}`); params.push(from); }
-    if (to) { conditions.push(`s.created_at <= $${params.length + 1}`); params.push(to + 'T23:59:59'); }
+    if (from) { conditions.push(`s.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires' >= $${params.length + 1}`); params.push(from); }
+    if (to) { conditions.push(`s.created_at AT TIME ZONE 'America/Argentina/Buenos_Aires' <= $${params.length + 1}`); params.push(to + ' 23:59:59'); }
     if (payment_method) { conditions.push(`s.payment_method = $${params.length + 1}`); params.push(payment_method); }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);

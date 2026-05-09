@@ -1,8 +1,11 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/theme';
+import { useCartStore } from '../../../store/cartStore';
 
 export default function TabsLayout() {
+  const cartCount = useCartStore(s => s.getItemCount());
+
   return (
     <Tabs
       screenOptions={{
@@ -42,6 +45,16 @@ export default function TabsLayout() {
             <Ionicons name="add-circle" size={size + 10} color={Colors.primary} />
           ),
           tabBarLabelStyle: { color: Colors.primary, fontSize: 11, fontWeight: '700' },
+          tabBarBadge: cartCount > 0 ? cartCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: Colors.accent,
+            color: '#0F0F1A',
+            fontSize: 10,
+            fontWeight: '800',
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+          },
         }}
       />
       <Tabs.Screen

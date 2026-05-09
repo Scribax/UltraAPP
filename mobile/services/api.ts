@@ -65,6 +65,9 @@ export const productsAPI = {
   importExcel:(file: FormData) => api.post('/products/import', file, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  uploadImage:(file: FormData) => api.post('/products/upload-image', file, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 export const salesAPI = {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
@@ -11,6 +11,8 @@ import { reportsAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store/authStore';
 import { usePlan } from '../../../hooks/usePlan';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
+import { TourOverlay } from '../../../components/TourOverlay';
+import { useTourStore } from '../../../store/tourStore';
 
 type Period = 'day' | 'week' | 'month' | 'year';
 
@@ -38,6 +40,19 @@ export default function StatsScreen() {
   const [period, setPeriod] = useState<Period>('month');
   const { business } = useAuthStore();
   const { requirePro } = usePlan();
+
+  const { currentStep, isActive } = useTourStore();
+  const topRef = useRef<View>(null);
+  const [topRect, setTopRect] = useState<any>(null);
+
+  useEffect(() => {
+    if (isActive && currentStep === 7) {
+      setTimeout(() => {
+        topRef.current?.measureInWindow((x, y, w, h) =>
+          setTopRect({ x, y, width: w, height: h }));
+      }, 150);
+    }
+  }, [currentStep, isActive]);
 
   const { data: salesData, isLoading: loadingSales } = useQuery({
     queryKey: ['stats-sales', business?.id, period],
@@ -143,8 +158,8 @@ export default function StatsScreen() {
           )}
         </View>
 
-        {/* Top productos */}
-        <View style={s.section}>
+        {/* Top productos - Paso 7 */}
+        <View ref={topRef} style={s.section}>
           <Text style={s.sectionTitle}>🏆 Productos más vendidos</Text>
           {loadingTop ? (
             <ActivityIndicator color={Colors.primary} />
@@ -167,6 +182,8 @@ export default function StatsScreen() {
           )}
         </View>
       </ScrollView>
+
+      {isActive && currentStep === 7 && <TourOverlay targetRect={topRect} />}
     </SafeAreaView>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -11,6 +11,10 @@ import { productsAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store/authStore';
 import { usePlan } from '../../../hooks/usePlan';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
+import { TourOverlay } from '../../../components/TourOverlay';
+import { useTourStore } from '../../../store/tourStore';
+import { EmptyState } from '../../../components/EmptyState';
+import { Image } from 'react-native';
 
 function StockBadge({ stock, min }: { stock: number; min: number }) {
   const isLow = stock <= min;
@@ -31,6 +35,18 @@ const sbStyles = StyleSheet.create({
 function ProductCard({ product, onEdit, onDelete }: any) {
   return (
     <TouchableOpacity style={s.card} onPress={() => onEdit(product)} activeOpacity={0.8}>
+      <View style={s.productImageContainer}>
+        {product.image_url ? (
+          <Image
+            source={{ uri: `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api'}`.replace('/api', '') + product.image_url }}
+            style={s.productImage}
+          />
+        ) : (
+          <View style={s.productImagePlaceholder}>
+            <Text style={s.productImageText}>{product.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
         {product.category_name && (
@@ -54,6 +70,20 @@ export default function ProductsScreen() {
   const { business } = useAuthStore();
   const { requirePro } = usePlan();
   const qc = useQueryClient();
+
+  // Tour centralizado (paso 8)
+  const { currentStep, isActive } = useTourStore();
+  const addBtnRef = useRef<InstanceType<typeof TouchableOpacity>>(null);
+  const [addBtnRect, setAddBtnRect] = useState<any>(null);
+
+  useEffect(() => {
+    if (isActive && currentStep === 8) {
+      setTimeout(() => {
+        addBtnRef.current?.measureInWindow((x, y, w, h) =>
+          setAddBtnRect({ x, y, width: w, height: h }));
+      }, 150);
+    }
+  }, [currentStep, isActive]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['products', business?.id, search, filter],
@@ -105,6 +135,7 @@ export default function ProductsScreen() {
             <Ionicons name="cloud-upload-outline" size={18} color={Colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
+            ref={addBtnRef}
             style={s.addBtn}
             onPress={() => router.push('/(app)/modals/product-form')}
           >
@@ -151,37 +182,42 @@ export default function ProductsScreen() {
             <ProductCard product={item} onEdit={handleEdit} onDelete={handleDelete} />
           )}
           ListEmptyComponent={
-            <View style={s.emptyState}>
-              <Ionicons name="cube-outline" size={48} color={Colors.textMuted} />
-              <Text style={s.emptyTitle}>Sin productos</Text>
-              <Text style={s.emptySubtitle}>Toca el + para agregar tu primer producto</Text>
-            </View>
+            <EmptyState
+              icon="cube-outline"
+              title="Inventario vacío"
+              subtitle={search ? 'No hay resultados para tu búsqueda.' : 'Crea tu primer producto con el botón +.'}
+            />
           }
           onRefresh={refetch}
           refreshing={false}
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      {isActive && currentStep === 8 && <TourOverlay targetRect={addBtnRect} />}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: Colors.bg },
-  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md },
-  title:          { color: Colors.text, fontSize: FontSize.xl, fontWeight: '700' },
-  addBtn:         { backgroundColor: Colors.primary, borderRadius: Radius.full, width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  importBtn:      { backgroundColor: Colors.bgCard, borderRadius: Radius.full, width: 36, height: 36, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  searchBar:      { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, marginHorizontal: Spacing.md, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm, marginBottom: Spacing.sm },
-  searchInput:    { flex: 1, color: Colors.text, fontSize: FontSize.md },
-  filterRow:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, gap: Spacing.sm, marginBottom: Spacing.sm },
-  filterChip:     { backgroundColor: Colors.bgCard, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 6, borderWidth: 1, borderColor: Colors.border },
-  filterActive:   { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterText:     { color: Colors.textSub, fontSize: FontSize.sm },
-  filterTextActive:{ color: '#fff', fontWeight: '700' },
-  countText:      { marginLeft: 'auto', color: Colors.textMuted, fontSize: FontSize.xs },
-  card:           { flexDirection: 'row', backgroundColor: Colors.bgCard, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.sm, alignItems: 'center' },
-  productName:    { color: Colors.text, fontSize: FontSize.md, fontWeight: '600' },
+  container:    { flex: 1, backgroundColor: Colors.bg },
+  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, paddingBottom: 0 },
+  headerTitle:  { color: Colors.text, fontSize: FontSize.xl, fontWeight: '800' },
+  addBtn:       { backgroundColor: Colors.primary, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  searchContainer:{ padding: Spacing.md },
+  searchInput:  { backgroundColor: Colors.bgInput, color: Colors.text, padding: Spacing.md, borderRadius: Radius.md, fontSize: FontSize.md },
+  filters:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm },
+  filterChip:   { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border },
+  filterActive: { backgroundColor: Colors.primary + '33', borderColor: Colors.primary },
+  filterText:   { color: Colors.textSub, fontSize: FontSize.sm, fontWeight: '600' },
+  filterTextActive:{ color: Colors.primary },
+  countText:    { color: Colors.textMuted, fontSize: FontSize.sm, marginLeft: 'auto' },
+  card:         { flexDirection: 'row', backgroundColor: Colors.bgCard, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.sm, alignItems: 'center', gap: Spacing.md },
+  productImageContainer: { width: 50, height: 50, borderRadius: Radius.sm, overflow: 'hidden' },
+  productImage: { width: '100%', height: '100%' },
+  productImagePlaceholder: { width: '100%', height: '100%', backgroundColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  productImageText: { color: Colors.textMuted, fontSize: FontSize.lg, fontWeight: '800' },
+  productName:  { color: Colors.text, fontSize: FontSize.md, fontWeight: '600', marginBottom: 2 },
   categoryLabel:  { color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 2 },
   price:          { color: Colors.accent, fontSize: FontSize.md, fontWeight: '700', marginTop: Spacing.xs },
   emptyState:     { flex: 1, alignItems: 'center', paddingTop: Spacing.xxl, gap: Spacing.sm },

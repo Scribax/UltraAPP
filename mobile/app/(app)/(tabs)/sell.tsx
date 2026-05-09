@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet, Alert, Modal, ActivityIndicator, ScrollView,
+  StyleSheet, Alert, Modal, ActivityIndicator, ScrollView, Animated
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlan } from '../../../hooks/usePlan';
 import { productsAPI, salesAPI, categoriesAPI } from '../../../services/api';
@@ -12,6 +13,10 @@ import { useCartStore } from '../../../store/cartStore';
 import { useAuthStore } from '../../../store/authStore';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
 import { BarcodeScannerModal } from '../../../components/BarcodeScannerModal';
+import { TourOverlay } from '../../../components/TourOverlay';
+import { useTourStore } from '../../../store/tourStore';
+import { EmptyState } from '../../../components/EmptyState';
+import { Image } from 'react-native';
 
 // ── Componente item en el carrito ──────────────────────────
 function CartItem({ item }: any) {
@@ -42,28 +47,58 @@ function CartItem({ item }: any) {
 // ── Componente producto en grilla ───────────────
 function ProductCard({ product, onAdd }: any) {
   const isOutOfStock = product.stock <= 0;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    if (isOutOfStock) return;
+    
+    // Animación de bounce al tocar
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.95, duration: 100, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true })
+    ]).start();
+    
+    onAdd(product);
+  };
+
   return (
-    <TouchableOpacity
-      style={[s.productCard, isOutOfStock && s.outOfStock]}
-      onPress={() => !isOutOfStock && onAdd(product)}
-      disabled={isOutOfStock}
-      activeOpacity={0.7}
-    >
-      <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
-      <View style={s.productCardBottom}>
-        <View>
-          <Text style={s.productPrice}>${parseFloat(product.sell_price).toFixed(2)}</Text>
-          <Text style={s.productStock}>Stock: {product.stock}</Text>
-        </View>
-        <View style={s.addIconCircle}>
-          <Ionicons
-            name={isOutOfStock ? 'close' : 'add'}
-            size={20}
-            color={isOutOfStock ? Colors.textMuted : '#fff'}
+    <Animated.View style={[s.productCard, isOutOfStock && s.outOfStock, { transform: [{ scale: scaleAnim }] }]}>
+      <TouchableOpacity
+        style={{ flex: 1 }}
+        onPress={handlePress}
+        disabled={isOutOfStock}
+        activeOpacity={0.7}
+      >
+        <View style={s.productCardContent}>
+        {product.image_url ? (
+          <Image
+            source={{ uri: `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api'}`.replace('/api', '') + product.image_url }}
+            style={s.productImage}
           />
+        ) : (
+          <View style={s.productImagePlaceholder}>
+            <Text style={s.productImageText}>{product.name.charAt(0).toUpperCase()}</Text>
+          </View>
+        )}
+        <View style={s.productInfo}>
+          <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
+          <View style={s.productCardBottom}>
+            <View>
+              <Text style={s.productPrice}>${parseFloat(product.sell_price).toFixed(2)}</Text>
+              <Text style={s.productStock}>Stock: {product.stock}</Text>
+            </View>
+            <View style={s.addIconCircle}>
+              <Ionicons
+                name={isOutOfStock ? 'close' : 'add'}
+                size={20}
+                color={isOutOfStock ? Colors.textMuted : '#fff'}
+              />
+            </View>
+          </View>
         </View>
       </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -72,6 +107,31 @@ export default function SellScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showPayment, setShowPayment] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+
+  // Tour centralizado (pasos 4 y 5)
+  const { currentStep, isActive } = useTourStore();
+  const categoriesRef = useRef<View>(null);
+  const searchRef = useRef<View>(null);
+  const [categoriesRect, setCategoriesRect] = useState<any>(null);
+  const [searchRect, setSearchRect] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const delay = setTimeout(() => {
+      if (currentStep === 4) {
+        categoriesRef.current?.measureInWindow((x, y, w, h) =>
+          setCategoriesRect({ x, y, width: w, height: h }));
+      }
+      if (currentStep === 5) {
+        searchRef.current?.measureInWindow((x, y, w, h) =>
+          setSearchRect({ x, y, width: w, height: h }));
+      }
+    }, 150);
+    return () => clearTimeout(delay);
+  }, [currentStep, isActive]);
+
+  const activeRect = currentStep === 4 ? categoriesRect : currentStep === 5 ? searchRect : null;
+
   const qc = useQueryClient();
   const { business } = useAuthStore();
   const { requirePro } = usePlan();
@@ -101,8 +161,11 @@ export default function SellScreen() {
       const finalTotal = res.data.total;
       cart.clear();
       setShowPayment(false);
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
-      qc.invalidateQueries({ queryKey: ['products-search'] });
+      // refetchType: 'all' garantiza que se actualice aunque la pestaña no esté visible
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' });
+      qc.invalidateQueries({ queryKey: ['products-search'], refetchType: 'all' });
+      qc.invalidateQueries({ queryKey: ['products'], refetchType: 'all' });
+      qc.invalidateQueries({ queryKey: ['sales'], refetchType: 'all' });
       Alert.alert('✅ Venta registrada', `Total: $${parseFloat(finalTotal).toFixed(2)}`);
     },
     onError: (err: any) => {
@@ -141,11 +204,11 @@ export default function SellScreen() {
 
       {/* Buscador y Categorías */}
       <View style={s.searchContainer}>
-        <View style={s.searchBar}>
+        <View ref={searchRef} style={s.searchBar}>
           <Ionicons name="search-outline" size={18} color={Colors.textSub} />
           <TextInput
             style={s.searchInput}
-            placeholder="Buscar producto..."
+            placeholder="Buscar por nombre o código..."
             placeholderTextColor={Colors.textMuted}
             value={search}
             onChangeText={setSearch}
@@ -156,29 +219,36 @@ export default function SellScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoriesScroll} contentContainerStyle={s.categoriesContainer}>
-          <TouchableOpacity
-            style={[s.categoryChip, selectedCategory === '' && s.categoryChipActive]}
-            onPress={() => setSelectedCategory('')}
+        <View ref={categoriesRef}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={s.categoriesScroll}
+            contentContainerStyle={s.categoriesContainer}
           >
-            <Text style={[s.categoryChipText, selectedCategory === '' && s.categoryChipTextActive]}>Todos</Text>
-          </TouchableOpacity>
-          {categories?.map((cat: any) => (
             <TouchableOpacity
-              key={cat.id}
-              style={[
-                s.categoryChip, 
-                selectedCategory === cat.id && s.categoryChipActive,
-                cat.color && { borderLeftColor: cat.color, borderLeftWidth: 4 }
-              ]}
-              onPress={() => setSelectedCategory(cat.id)}
+              style={[s.categoryChip, selectedCategory === '' && s.categoryChipActive]}
+              onPress={() => setSelectedCategory('')}
             >
-              <Text style={[s.categoryChipText, selectedCategory === cat.id && s.categoryChipTextActive]}>
-                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-              </Text>
+              <Text style={[s.categoryChipText, selectedCategory === '' && s.categoryChipTextActive]}>Todos</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            {categories?.map((category: any) => (
+              <TouchableOpacity
+                key={category.id}
+                style={[
+                  s.categoryChip,
+                  selectedCategory === category.id && s.categoryChipActive,
+                  category.color && { borderLeftColor: category.color, borderLeftWidth: 4 }
+                ]}
+                onPress={() => setSelectedCategory(category.id)}
+              >
+                <Text style={[s.categoryChipText, selectedCategory === category.id && s.categoryChipTextActive]}>
+                  {category.icon ? `${category.icon} ` : ''}{category.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       </View>
 
       {/* Grilla de productos */}
@@ -189,16 +259,17 @@ export default function SellScreen() {
           <FlatList
             data={products || []}
             keyExtractor={p => p.id}
-            numColumns={2}
-            columnWrapperStyle={s.gridRow}
+            numColumns={1}
             contentContainerStyle={s.gridContainer}
             renderItem={({ item }) => (
               <ProductCard product={item} onAdd={(p: any) => cart.addItem(p)} />
             )}
             ListEmptyComponent={
-              <Text style={s.emptyText}>
-                {search ? 'Sin resultados' : 'No hay productos en esta categoría'}
-              </Text>
+              <EmptyState
+                icon="pricetag-outline"
+                title="Sin productos"
+                subtitle={search ? 'No se encontraron resultados.' : 'No hay productos en esta categoría.'}
+              />
             }
             showsVerticalScrollIndicator={false}
           />
@@ -268,6 +339,11 @@ export default function SellScreen() {
         title="Escanear producto"
         subtitle="El producto se sumará al carrito automáticamente"
       />
+
+      {/* Tour — Pasos 4 y 5 */}
+      {isActive && [4, 5].includes(currentStep) && (
+        <TourOverlay targetRect={activeRect} />
+      )}
     </SafeAreaView>
   );
 }
@@ -289,9 +365,7 @@ const s = StyleSheet.create({
   productsContainer: { flex: 1, paddingHorizontal: Spacing.md },
   gridContainer:   { paddingBottom: Spacing.xxl },
   gridRow:         { justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.sm },
-  productCard:     { flex: 1, backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.md, minHeight: 120, justifyContent: 'space-between', borderWidth: 1, borderColor: 'transparent' },
   outOfStock:      { opacity: 0.4 },
-  productName:     { color: Colors.text, fontSize: FontSize.md, fontWeight: '600', marginBottom: Spacing.sm },
   productCardBottom:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   productStock:    { color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 2 },
   productPrice:    { color: Colors.accent, fontSize: FontSize.lg, fontWeight: '800' },
@@ -314,6 +388,40 @@ const s = StyleSheet.create({
   modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalBox:        { backgroundColor: Colors.bgModal, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg },
   modalTitle:      { color: Colors.text, fontSize: FontSize.lg, fontWeight: '700', marginBottom: Spacing.lg, textAlign: 'center' },
+  productCard: {
+    backgroundColor: Colors.bgInput,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+  },
+  productCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  productImage: {
+    width: 50,
+    height: 50,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.bg,
+  },
+  productImagePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productImageText: {
+    color: Colors.textMuted,
+    fontSize: FontSize.lg,
+    fontWeight: '800',
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productName: { color: Colors.text, fontSize: FontSize.md, fontWeight: '600', marginBottom: 4 },
   paymentOption:   { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.bgCard, borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border },
   paymentLabel:    { fontSize: FontSize.md, fontWeight: '600' },
   modalActions:    { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },

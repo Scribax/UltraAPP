@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Image
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,8 @@ export default function ProductFormModal() {
     stock: '0',
     min_stock: '5',
     barcode: '',
+    image_url: '',
+    image_uri: null as string | null, // Para la previsualización local
   });
 
   const { data: product, isLoading: loadingProduct } = useQuery({
@@ -40,9 +43,23 @@ export default function ProductFormModal() {
         stock: String(product.stock),
         min_stock: String(product.min_stock),
         barcode: product.barcode || '',
+        image_url: product.image_url || '',
+        image_uri: product.image_url ? `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api'}`.replace('/api', '') + product.image_url : null,
       });
     }
   }, [product]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+    if (!result.canceled) {
+      setForm(prev => ({ ...prev, image_uri: result.assets[0].uri }));
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: (data: any) => isEditing ? productsAPI.update(id as string, data) : productsAPI.create(data),
@@ -57,10 +74,29 @@ export default function ProductFormModal() {
     }
   });
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.sell_price) {
       return Alert.alert('Error', 'El nombre y precio de venta son obligatorios');
     }
+    
+    let uploadedUrl = form.image_url;
+    // Si hay una URI local y no es una URL remota, la subimos
+    if (form.image_uri && !form.image_uri.startsWith('http')) {
+      try {
+        const fileData = new FormData();
+        fileData.append('image', {
+          uri: form.image_uri,
+          name: 'photo.jpg',
+          type: 'image/jpeg'
+        } as any);
+        const uploadRes = await productsAPI.uploadImage(fileData);
+        uploadedUrl = uploadRes.data.url;
+      } catch (err) {
+        Alert.alert('Error', 'No se pudo subir la imagen');
+        return;
+      }
+    }
+
     const data = {
       name: form.name.trim(),
       sell_price: parseFloat(form.sell_price),
@@ -68,6 +104,7 @@ export default function ProductFormModal() {
       stock: parseInt(form.stock) || 0,
       min_stock: parseInt(form.min_stock) || 5,
       barcode: form.barcode.trim() || undefined,
+      image_url: uploadedUrl || undefined,
     };
     saveMutation.mutate(data);
   };
@@ -87,6 +124,20 @@ export default function ProductFormModal() {
       </View>
 
       <ScrollView contentContainerStyle={s.form}>
+        {/* Imagen del producto */}
+        <View style={s.imagePickerContainer}>
+          <TouchableOpacity style={s.imagePicker} onPress={pickImage}>
+            {form.image_uri ? (
+              <Image source={{ uri: form.image_uri }} style={s.imagePreview} />
+            ) : (
+              <View style={s.imagePlaceholder}>
+                <Ionicons name="camera" size={32} color={Colors.textMuted} />
+                <Text style={s.imagePickerText}>Agregar Foto</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <View style={s.field}>
           <Text style={s.label}>Nombre *</Text>
           <TextInput style={s.input} placeholder="Ej: Coca Cola 500ml" placeholderTextColor={Colors.textMuted} value={form.name} onChangeText={t => setForm({ ...form, name: t })} />
@@ -147,8 +198,41 @@ export default function ProductFormModal() {
 const s = StyleSheet.create({
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
   title:       { color: Colors.text, fontSize: FontSize.md, fontWeight: '700' },
-  cancelText:  { color: Colors.textSub, fontSize: FontSize.md },
+  cancelText: {
+    color: Colors.textMuted,
+    fontSize: FontSize.md,
+    fontWeight: '600',
+  },
   saveText:    { color: Colors.primary, fontSize: FontSize.md, fontWeight: '700' },
+  imagePickerContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  imagePicker: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: Colors.bgInput,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  imagePlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePickerText: {
+    color: Colors.textMuted,
+    fontSize: 10,
+    marginTop: 4,
+    fontWeight: '600',
+  },
   form:        { padding: Spacing.lg },
   field:       { marginBottom: Spacing.md },
   label:       { color: Colors.textSub, fontSize: FontSize.sm, marginBottom: 4 },

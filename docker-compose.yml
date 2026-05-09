@@ -20,6 +20,7 @@ services:
       - miapp_net
     volumes:
       - ./backend/logs:/app/logs   # logs persistentes
+      - ./backend/uploads:/app/uploads # imágenes de productos persistentes
 
   # ── PostgreSQL ───────────────────────────────────────────
   db:

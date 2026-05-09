@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator,
@@ -10,6 +10,9 @@ import { router } from 'expo-router';
 import { salesAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store/authStore';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
+import { TourOverlay } from '../../../components/TourOverlay';
+import { useTourStore } from '../../../store/tourStore';
+import { EmptyState } from '../../../components/EmptyState';
 
 const PAYMENT_COLORS: Record<string, string> = {
   efectivo: Colors.accent,
@@ -25,9 +28,13 @@ const PERIOD_OPTIONS = [
 
 function getDateRange(period: string) {
   const now = new Date();
-  const to = now.toISOString().split('T')[0];
+  const offset = now.getTimezoneOffset() * 60000;
+  const localDate = new Date(now.getTime() - offset);
+  
+  const to = localDate.toISOString().split('T')[0];
   if (period === 'today') return { from: to, to };
-  const d = new Date(now);
+  
+  const d = new Date(localDate);
   if (period === 'week') d.setDate(d.getDate() - 7);
   if (period === 'month') d.setDate(d.getDate() - 30);
   return { from: d.toISOString().split('T')[0], to };
@@ -61,6 +68,19 @@ export default function HistoryScreen() {
   const { business } = useAuthStore();
   const { from, to } = getDateRange(period);
 
+  const { currentStep, isActive } = useTourStore();
+  const periodRef = useRef<View>(null);
+  const [periodRect, setPeriodRect] = useState<any>(null);
+
+  useEffect(() => {
+    if (isActive && currentStep === 6) {
+      setTimeout(() => {
+        periodRef.current?.measureInWindow((x, y, w, h) =>
+          setPeriodRect({ x, y, width: w, height: h }));
+      }, 150);
+    }
+  }, [currentStep, isActive]);
+
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['sales-history', business?.id, period],
     queryFn: () => salesAPI.list({ from, to }).then(r => r.data),
@@ -74,7 +94,7 @@ export default function HistoryScreen() {
       </View>
 
       {/* Filtro de período */}
-      <View style={s.periodRow}>
+      <View ref={periodRef} style={s.periodRow}>
         {PERIOD_OPTIONS.map(p => (
           <TouchableOpacity
             key={p.key}
@@ -115,14 +135,16 @@ export default function HistoryScreen() {
           onRefresh={refetch}
           refreshing={false}
           ListEmptyComponent={
-            <View style={s.emptyState}>
-              <Ionicons name="receipt-outline" size={48} color={Colors.textMuted} />
-              <Text style={s.emptyText}>Sin ventas en este período</Text>
-            </View>
+            <EmptyState
+              icon="receipt-outline"
+              title="Sin ventas aún"
+              subtitle="No hay transacciones registradas para este período."
+            />
           }
           showsVerticalScrollIndicator={false}
         />
-      )}
+        )}
+      {isActive && currentStep === 6 && <TourOverlay targetRect={periodRect} />}
     </SafeAreaView>
   );
 }
