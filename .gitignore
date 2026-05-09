@@ -1,0 +1,23 @@
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# SO
+.DS_Store
+Thumbs.db
+
+# Logs de PM2 (si corres local)
+logs/
+*.log
+
+# Redis/Postgres local data (si existieran carpetas montadas)
+data/
+redis-data/
+pg-data/

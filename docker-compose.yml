@@ -1,0 +1,87 @@
+version: '3.9'
+
+services:
+  # ── Backend API ──────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: miapp_api
+    restart: unless-stopped
+    env_file: ./backend/.env
+    ports:
+      - "3001:3001"        # Nginx hará proxy a este puerto
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - miapp_net
+    volumes:
+      - ./backend/logs:/app/logs   # logs persistentes
+
+  # ── PostgreSQL ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: miapp_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-miapp_db}
+      POSTGRES_USER: ${DB_USER:-miapp_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_this_password}
+    ports:
+      - "5432:5432"        # Solo accesible localmente
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d  # auto-migrar al crear
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-miapp_user} -d ${DB_NAME:-miapp_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - miapp_net
+
+  # ── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: miapp_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - miapp_net
+
+  # ── Nginx ────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: miapp_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - api
+    networks:
+      - miapp_net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  miapp_net:
+    driver: bridge
