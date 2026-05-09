@@ -36,7 +36,7 @@ function ProductCard({ product, onEdit, onDelete }: any) {
         {product.category_name && (
           <Text style={s.categoryLabel}>{product.category_name}</Text>
         )}
-        <Text style={s.price}>${product.sell_price.toFixed(2)}</Text>
+        <Text style={s.price}>${parseFloat(product.sell_price).toFixed(2)}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: Spacing.xs }}>
         <StockBadge stock={product.stock} min={product.min_stock} />

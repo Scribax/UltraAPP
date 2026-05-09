@@ -8,11 +8,13 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { productsAPI } from '../../../services/api';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
+import { BarcodeScannerModal } from '../../../components/BarcodeScannerModal';
 
 export default function ProductFormModal() {
   const { id } = useLocalSearchParams();
   const isEditing = !!id;
   const qc = useQueryClient();
+  const [showScanner, setShowScanner] = useState(false);
 
   const [form, setForm] = useState({
     name: '',
@@ -46,6 +48,7 @@ export default function ProductFormModal() {
     mutationFn: (data: any) => isEditing ? productsAPI.update(id as string, data) : productsAPI.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
+      qc.invalidateQueries({ queryKey: ['products-search'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       router.back();
     },
@@ -121,12 +124,22 @@ export default function ProductFormModal() {
           <Text style={s.label}>Código de barras</Text>
           <View style={s.barcodeRow}>
             <TextInput style={[s.input, { flex: 1 }]} placeholder="Escanear o tipear" placeholderTextColor={Colors.textMuted} value={form.barcode} onChangeText={t => setForm({ ...form, barcode: t })} />
-            <TouchableOpacity style={s.scanBtn}>
+            <TouchableOpacity style={s.scanBtn} onPress={() => setShowScanner(true)}>
               <Ionicons name="barcode-outline" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
+
+      <BarcodeScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScan={(code) => {
+          setForm(f => ({ ...f, barcode: code }));
+        }}
+        title="Escanear código de barras"
+        subtitle="El código se copiará al formulario"
+      />
     </KeyboardAvoidingView>
   );
 }

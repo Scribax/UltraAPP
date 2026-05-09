@@ -1,16 +1,17 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity,
-  StyleSheet, Alert, Modal, ActivityIndicator,
+  StyleSheet, Alert, Modal, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlan } from '../../../hooks/usePlan';
-import { productsAPI, salesAPI } from '../../../services/api';
+import { productsAPI, salesAPI, categoriesAPI } from '../../../services/api';
 import { useCartStore } from '../../../store/cartStore';
 import { useAuthStore } from '../../../store/authStore';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
+import { BarcodeScannerModal } from '../../../components/BarcodeScannerModal';
 
 // ── Componente item en el carrito ──────────────────────────
 function CartItem({ item }: any) {
@@ -38,41 +39,53 @@ function CartItem({ item }: any) {
   );
 }
 
-// ── Componente producto en lista de búsqueda ───────────────
-function ProductRow({ product, onAdd }: any) {
+// ── Componente producto en grilla ───────────────
+function ProductCard({ product, onAdd }: any) {
   const isOutOfStock = product.stock <= 0;
   return (
     <TouchableOpacity
-      style={[s.productRow, isOutOfStock && s.outOfStock]}
+      style={[s.productCard, isOutOfStock && s.outOfStock]}
       onPress={() => !isOutOfStock && onAdd(product)}
       disabled={isOutOfStock}
+      activeOpacity={0.7}
     >
-      <View style={{ flex: 1 }}>
-        <Text style={s.productName}>{product.name}</Text>
-        <Text style={s.productStock}>Stock: {product.stock}</Text>
+      <Text style={s.productName} numberOfLines={2}>{product.name}</Text>
+      <View style={s.productCardBottom}>
+        <View>
+          <Text style={s.productPrice}>${parseFloat(product.sell_price).toFixed(2)}</Text>
+          <Text style={s.productStock}>Stock: {product.stock}</Text>
+        </View>
+        <View style={s.addIconCircle}>
+          <Ionicons
+            name={isOutOfStock ? 'close' : 'add'}
+            size={20}
+            color={isOutOfStock ? Colors.textMuted : '#fff'}
+          />
+        </View>
       </View>
-      <Text style={s.productPrice}>${product.sell_price.toFixed(2)}</Text>
-      <Ionicons
-        name={isOutOfStock ? 'close-circle-outline' : 'add-circle-outline'}
-        size={24}
-        color={isOutOfStock ? Colors.textMuted : Colors.primary}
-        style={{ marginLeft: Spacing.sm }}
-      />
     </TouchableOpacity>
   );
 }
 
 export default function SellScreen() {
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showPayment, setShowPayment] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const qc = useQueryClient();
   const { business } = useAuthStore();
   const { requirePro } = usePlan();
   const cart = useCartStore();
 
+  const { data: categories } = useQuery({
+    queryKey: ['categories', business?.id],
+    queryFn: () => categoriesAPI.list().then(r => r.data),
+    enabled: !!business?.id,
+  });
+
   const { data: products, isLoading } = useQuery({
-    queryKey: ['products-search', search, business?.id],
-    queryFn: () => productsAPI.search(search).then(r => r.data.products),
+    queryKey: ['products-search', search, selectedCategory, business?.id],
+    queryFn: () => productsAPI.search(search, selectedCategory || undefined).then(r => r.data.products),
     enabled: !!business?.id,
     staleTime: 10_000,
   });
@@ -82,19 +95,31 @@ export default function SellScreen() {
       items: cart.items.map(i => ({ product_id: i.productId, quantity: i.qty })),
       payment_method: cart.paymentMethod,
       discount: cart.discount,
-      employee_id: cart.employeeId,
+      employee_id: cart.employeeId || undefined,
     }),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      const finalTotal = res.data.total;
       cart.clear();
       setShowPayment(false);
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['products-search'] });
-      Alert.alert('✅ Venta registrada', `Total: $${cart.getTotal().toFixed(2)}`);
+      Alert.alert('✅ Venta registrada', `Total: $${parseFloat(finalTotal).toFixed(2)}`);
     },
     onError: (err: any) => {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo registrar la venta');
     },
   });
+
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      const res = await productsAPI.byBarcode(code);
+      const product = res.data;
+      cart.addItem(product);
+      Alert.alert('✅ Agregado', `${product.name} agregado al carrito`);
+    } catch {
+      Alert.alert('No encontrado', `No hay producto con código: ${code}`);
+    }
+  };
 
   const paymentMethods: Array<{ key: typeof cart.paymentMethod; label: string; icon: string; color: string }> = [
     { key: 'efectivo',     label: 'Efectivo',      icon: 'cash-outline',     color: Colors.accent },
@@ -114,25 +139,49 @@ export default function SellScreen() {
         )}
       </View>
 
-      {/* Buscador */}
-      <View style={s.searchBar}>
-        <Ionicons name="search-outline" size={18} color={Colors.textSub} />
-        <TextInput
-          style={s.searchInput}
-          placeholder="Buscar producto..."
-          placeholderTextColor={Colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          autoCorrect={false}
-        />
-        <TouchableOpacity onPress={() => requirePro('barcode_scanner', () => {
-          /* TODO: abrir cámara barcode */
-        })}>
-          <Ionicons name="barcode-outline" size={22} color={Colors.primary} />
-        </TouchableOpacity>
+      {/* Buscador y Categorías */}
+      <View style={s.searchContainer}>
+        <View style={s.searchBar}>
+          <Ionicons name="search-outline" size={18} color={Colors.textSub} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Buscar producto..."
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={setSearch}
+            autoCorrect={false}
+          />
+          <TouchableOpacity onPress={() => setShowScanner(true)}>
+            <Ionicons name="barcode-outline" size={22} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.categoriesScroll} contentContainerStyle={s.categoriesContainer}>
+          <TouchableOpacity
+            style={[s.categoryChip, selectedCategory === '' && s.categoryChipActive]}
+            onPress={() => setSelectedCategory('')}
+          >
+            <Text style={[s.categoryChipText, selectedCategory === '' && s.categoryChipTextActive]}>Todos</Text>
+          </TouchableOpacity>
+          {categories?.map((cat: any) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                s.categoryChip, 
+                selectedCategory === cat.id && s.categoryChipActive,
+                cat.color && { borderLeftColor: cat.color, borderLeftWidth: 4 }
+              ]}
+              onPress={() => setSelectedCategory(cat.id)}
+            >
+              <Text style={[s.categoryChipText, selectedCategory === cat.id && s.categoryChipTextActive]}>
+                {cat.icon ? `${cat.icon} ` : ''}{cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Lista de productos */}
+      {/* Grilla de productos */}
       <View style={s.productsContainer}>
         {isLoading ? (
           <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.lg }} />
@@ -140,12 +189,15 @@ export default function SellScreen() {
           <FlatList
             data={products || []}
             keyExtractor={p => p.id}
+            numColumns={2}
+            columnWrapperStyle={s.gridRow}
+            contentContainerStyle={s.gridContainer}
             renderItem={({ item }) => (
-              <ProductRow product={item} onAdd={(p: any) => cart.addItem(p)} />
+              <ProductCard product={item} onAdd={(p: any) => cart.addItem(p)} />
             )}
             ListEmptyComponent={
               <Text style={s.emptyText}>
-                {search ? 'Sin resultados' : 'Escribe para buscar productos'}
+                {search ? 'Sin resultados' : 'No hay productos en esta categoría'}
               </Text>
             }
             showsVerticalScrollIndicator={false}
@@ -207,6 +259,15 @@ export default function SellScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Scanner de código de barras */}
+      <BarcodeScannerModal
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScan={handleBarcodeScan}
+        title="Escanear producto"
+        subtitle="El producto se sumará al carrito automáticamente"
+      />
     </SafeAreaView>
   );
 }
@@ -216,14 +277,25 @@ const s = StyleSheet.create({
   header:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md },
   title:           { color: Colors.text, fontSize: FontSize.lg, fontWeight: '700' },
   clearBtn:        { color: Colors.danger, fontSize: FontSize.sm },
-  searchBar:       { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, marginHorizontal: Spacing.md, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm, marginBottom: Spacing.sm },
+  searchContainer: { backgroundColor: Colors.bg, paddingBottom: Spacing.sm, paddingTop: Spacing.sm, zIndex: 10 },
+  searchBar:       { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, marginHorizontal: Spacing.md, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm, marginBottom: Spacing.md },
   searchInput:     { flex: 1, color: Colors.text, fontSize: FontSize.md },
-  productsContainer: { flex: 1, marginHorizontal: Spacing.md },
-  productRow:      { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgCard, padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.xs },
+  categoriesScroll:{ flexGrow: 0, marginBottom: Spacing.sm },
+  categoriesContainer: { paddingHorizontal: Spacing.md, gap: Spacing.sm },
+  categoryChip:    { backgroundColor: Colors.bgCard, paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
+  categoryChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  categoryChipText:{ color: Colors.textSub, fontSize: FontSize.sm, fontWeight: '600' },
+  categoryChipTextActive: { color: '#fff' },
+  productsContainer: { flex: 1, paddingHorizontal: Spacing.md },
+  gridContainer:   { paddingBottom: Spacing.xxl },
+  gridRow:         { justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.sm },
+  productCard:     { flex: 1, backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.md, minHeight: 120, justifyContent: 'space-between', borderWidth: 1, borderColor: 'transparent' },
   outOfStock:      { opacity: 0.4 },
-  productName:     { color: Colors.text, fontSize: FontSize.sm, fontWeight: '600' },
-  productStock:    { color: Colors.textMuted, fontSize: FontSize.xs },
-  productPrice:    { color: Colors.accent, fontSize: FontSize.md, fontWeight: '700' },
+  productName:     { color: Colors.text, fontSize: FontSize.md, fontWeight: '600', marginBottom: Spacing.sm },
+  productCardBottom:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  productStock:    { color: Colors.textMuted, fontSize: FontSize.xs, marginTop: 2 },
+  productPrice:    { color: Colors.accent, fontSize: FontSize.lg, fontWeight: '800' },
+  addIconCircle:   { backgroundColor: Colors.primary, width: 32, height: 32, borderRadius: Radius.full, justifyContent: 'center', alignItems: 'center' },
   emptyText:       { color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.xl },
   cartContainer:   { backgroundColor: Colors.bgCard, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.md, borderTopWidth: 1, borderTopColor: Colors.border },
   cartTitle:       { color: Colors.text, fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.sm },

@@ -13,8 +13,8 @@ export const api = axios.create({
 api.interceptors.request.use(async (config) => {
   const token      = await SecureStore.getItemAsync('access_token');
   const businessId = await SecureStore.getItemAsync('business_id');
-  if (token)      config.headers.Authorization = `Bearer ${token}`;
-  if (businessId) config.headers['X-Business-Id'] = businessId;
+  if (token)      config.headers.set('Authorization', `Bearer ${token}`);
+  if (businessId) config.headers.set('X-Business-Id', businessId);
   return config;
 });
 
@@ -29,7 +29,7 @@ api.interceptors.response.use(
         const refresh = await SecureStore.getItemAsync('refresh_token');
         const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { token: refresh });
         await SecureStore.setItemAsync('access_token', data.access);
-        original.headers.Authorization = `Bearer ${data.access}`;
+        original.headers.set('Authorization', `Bearer ${data.access}`);
         return api(original);
       } catch {
         await SecureStore.deleteItemAsync('access_token');
@@ -61,7 +61,7 @@ export const productsAPI = {
   update:     (id: string, d: any) => api.put(`/products/${id}`, d),
   remove:     (id: string)   => api.delete(`/products/${id}`),
   byBarcode:  (code: string) => api.get(`/products/barcode/${code}`),
-  search:     (q: string)    => api.get('/products', { params: { search: q } }),
+  search:     (q: string, category_id?: string) => api.get('/products', { params: { search: q, category_id } }),
   importExcel:(file: FormData) => api.post('/products/import', file, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

@@ -44,7 +44,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     return { items: [...state.items, {
       productId: product.id,
       name: product.name,
-      price: product.sell_price,
+      price: typeof product.sell_price === 'string' ? parseFloat(product.sell_price) : product.sell_price,
       qty: 1,
       stock: product.stock,
     }]};
