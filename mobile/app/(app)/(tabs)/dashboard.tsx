@@ -182,12 +182,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* KPIs - Paso 1 */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: Spacing.md }}>
-          <Text style={s.sectionTitle}>📊 Resumen Financiero</Text>
-          <TouchableOpacity onPress={() => router.push('/(app)/modals/expenses')}>
-            <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: '700' }}>Gestionar Gastos →</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={s.sectionTitle}>📊 Resumen Financiero</Text>
         <View ref={kpiRowRef}>
           <View style={s.kpiRow}>
             <KpiCard label="Ventas Hoy" value={formatMoney(data?.today?.revenue || 0)} icon="cash-outline" color={Colors.accent} />
@@ -218,6 +213,14 @@ export default function DashboardScreen() {
               <Text style={[s.monthlyValue, { color: Colors.danger }]}>-{formatMoney(data?.month?.expenses || 0)}</Text>
             </View>
           </View>
+
+          <TouchableOpacity 
+            style={s.manageExpensesBtn} 
+            onPress={() => router.push('/(app)/modals/expenses')}
+          >
+            <Ionicons name="receipt-outline" size={16} color={Colors.primary} />
+            <Text style={s.manageExpensesBtnText}>Gestionar Gastos y Costos</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Gráfico - Paso 2 */}
@@ -318,6 +321,19 @@ const s = StyleSheet.create({
   monthlyItem:  { },
   monthlyLabel: { color: Colors.textMuted, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 },
   monthlyValue: { color: Colors.text, fontSize: 12, fontWeight: '700' },
+  manageExpensesBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: Colors.primary + '15', 
+    marginTop: Spacing.md, 
+    paddingVertical: Spacing.sm, 
+    borderRadius: Radius.md,
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderColor: Colors.primary + '33'
+  },
+  manageExpensesBtnText: { color: Colors.primary, fontSize: 12, fontWeight: '700' },
   progressBg:   { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: 4, borderRadius: 2 },
   sellBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md + 4, gap: Spacing.sm, marginTop: Spacing.sm },
