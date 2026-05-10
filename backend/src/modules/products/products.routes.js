@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const auth = require('../../middleware/auth');
 const tenant = require('../../middleware/tenant');
+const cacheMiddleware = require('../../middleware/cacheMiddleware');
 const requirePro = require('../../middleware/requirePro');
 const { list, create, update, remove, getByBarcode, importExcel } = require('./products.controller');
 
@@ -21,11 +22,12 @@ const storage = multer.diskStorage({
 const uploadDisk = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 router.use(auth, tenant);
 
-router.get('/', list);
+// Caché de 10 segundos para lecturas (ultra rápido, y se renueva casi en tiempo real)
+router.get('/', cacheMiddleware(10), list);
 router.post('/', create);
 router.put('/:id', update);
 router.delete('/:id', remove);
-router.get('/barcode/:code', getByBarcode);
+router.get('/barcode/:code', cacheMiddleware(30), getByBarcode); // 30s para barcodes
 
 // Subida de imagen para producto
 router.post('/upload-image', uploadDisk.single('image'), require('./products.controller').uploadImage);

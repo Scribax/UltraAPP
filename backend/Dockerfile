@@ -21,4 +21,4 @@ EXPOSE 3001
 
 # dumb-init evita problemas de PID 1 con Node.js
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "src/app.js"]
+CMD ["npx", "pm2-runtime", "ecosystem.config.js"]

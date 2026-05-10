@@ -31,19 +31,28 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting global con memoria (cambiar a Redis en producción)
+// ── Rate Limiting con Redis (Performance Enterprise) ────────
+const RedisStore = require('rate-limit-redis');
+const redisClient = require('./config/redis');
+
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
   message: { error: 'Demasiadas solicitudes' },
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    sendCommand: (...args) => redisClient.sendCommand(args),
+  }),
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
   message: { error: 'Demasiados intentos de autenticación' },
+  store: new RedisStore({
+    sendCommand: (...args) => redisClient.sendCommand(args),
+  }),
 });
 
 app.use(globalLimiter);
