@@ -32,7 +32,11 @@ export default function ExpensesModal() {
       setShowAdd(false);
       setForm({ description: '', amount: '', category: 'Otros' });
     },
-    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || 'Error al guardar')
+    onError: (err: any) => {
+      console.error(err);
+      const msg = err.response?.data?.error || err.message || 'Error desconocido';
+      Alert.alert('Error', `${msg} (${err.response?.status || 'Net'})`);
+    }
   });
 
   const deleteMutation = useMutation({
