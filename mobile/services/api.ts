@@ -106,3 +106,9 @@ export const cashAPI = {
   getStatus: () => api.get('/cash/status'),
   getShiftReport: () => api.get('/cash/shift-report'),
 };
+
+export const expenseAPI = {
+  create: (data: any) => api.post('/expenses', data),
+  list: (params: any) => api.get('/expenses', { params }),
+  remove: (id: string) => api.delete(`/expenses/${id}`),
+};

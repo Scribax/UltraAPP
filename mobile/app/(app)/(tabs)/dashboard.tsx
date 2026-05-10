@@ -182,7 +182,12 @@ export default function DashboardScreen() {
         </View>
 
         {/* KPIs - Paso 1 */}
-        <Text style={s.sectionTitle}>📊 Resumen Financiero</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: Spacing.md }}>
+          <Text style={s.sectionTitle}>📊 Resumen Financiero</Text>
+          <TouchableOpacity onPress={() => router.push('/(app)/modals/expenses')}>
+            <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: '700' }}>Gestionar Gastos →</Text>
+          </TouchableOpacity>
+        </View>
         <View ref={kpiRowRef}>
           <View style={s.kpiRow}>
             <KpiCard label="Ventas Hoy" value={formatMoney(data?.today?.revenue || 0)} icon="cash-outline" color={Colors.accent} />
