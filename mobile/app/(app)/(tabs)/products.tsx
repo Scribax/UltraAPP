@@ -73,7 +73,7 @@ export default function ProductsScreen() {
 
   // Tour centralizado (paso 8)
   const { currentStep, isActive } = useTourStore();
-  const addBtnRef = useRef<InstanceType<typeof TouchableOpacity>>(null);
+  const addBtnRef = useRef<any>(null);
   const [addBtnRect, setAddBtnRect] = useState<any>(null);
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function ProductsScreen() {
     <SafeAreaView style={s.container} edges={['top']}>
       {/* Header */}
       <View style={s.header}>
-        <Text style={s.title}>Productos</Text>
+        <Text style={s.headerTitle}>Productos</Text>
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <TouchableOpacity
             style={s.importBtn}
@@ -145,7 +145,7 @@ export default function ProductsScreen() {
       </View>
 
       {/* Buscador */}
-      <View style={s.searchBar}>
+      <View style={s.searchContainer}>
         <Ionicons name="search-outline" size={18} color={Colors.textSub} />
         <TextInput
           style={s.searchInput}
@@ -157,7 +157,7 @@ export default function ProductsScreen() {
       </View>
 
       {/* Filtros */}
-      <View style={s.filterRow}>
+      <View style={s.filters}>
         {filters.map(f => (
           <TouchableOpacity
             key={f.key}
@@ -204,7 +204,8 @@ const s = StyleSheet.create({
   header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, paddingBottom: 0 },
   headerTitle:  { color: Colors.text, fontSize: FontSize.xl, fontWeight: '800' },
   addBtn:       { backgroundColor: Colors.primary, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  searchContainer:{ padding: Spacing.md },
+  importBtn:    { backgroundColor: Colors.bgCard, width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  searchContainer:{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, marginHorizontal: Spacing.md, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm, marginBottom: Spacing.sm },
   searchInput:  { backgroundColor: Colors.bgInput, color: Colors.text, padding: Spacing.md, borderRadius: Radius.md, fontSize: FontSize.md },
   filters:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, marginBottom: Spacing.md, gap: Spacing.sm },
   filterChip:   { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border },
