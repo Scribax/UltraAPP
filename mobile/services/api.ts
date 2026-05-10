@@ -13,8 +13,13 @@ export const api = axios.create({
 api.interceptors.request.use(async (config) => {
   const token      = await SecureStore.getItemAsync('access_token');
   const businessId = await SecureStore.getItemAsync('business_id');
-  if (token)      config.headers['Authorization'] = `Bearer ${token}`;
-  if (businessId) config.headers['X-Business-Id'] = businessId;
+  
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (businessId) {
+    config.headers['X-Business-Id'] = businessId;
+  }
   return config;
 });
 
