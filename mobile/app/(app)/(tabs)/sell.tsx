@@ -17,6 +17,7 @@ import { TourOverlay } from '../../../components/TourOverlay';
 import { useTourStore } from '../../../store/tourStore';
 import { EmptyState } from '../../../components/EmptyState';
 import { Image } from 'react-native';
+import { generatePremiumTicket } from '../../../utils/premiumTicket';
 
 // ── Componente item en el carrito ──────────────────────────
 function CartItem({ item }: any) {
@@ -107,6 +108,8 @@ export default function SellScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [showPayment, setShowPayment] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [lastSale, setLastSale] = useState<any>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // Tour centralizado (pasos 4 y 5)
   const { currentStep, isActive } = useTourStore();
@@ -158,15 +161,16 @@ export default function SellScreen() {
       employee_id: cart.employeeId || undefined,
     }),
     onSuccess: (res) => {
-      const finalTotal = res.data.total;
+      const saleData = res.data;
+      setLastSale(saleData);
       cart.clear();
       setShowPayment(false);
+      setShowSuccess(true);
       // refetchType: 'all' garantiza que se actualice aunque la pestaña no esté visible
       qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' });
       qc.invalidateQueries({ queryKey: ['products-search'], refetchType: 'all' });
       qc.invalidateQueries({ queryKey: ['products'], refetchType: 'all' });
       qc.invalidateQueries({ queryKey: ['sales'], refetchType: 'all' });
-      Alert.alert('✅ Venta registrada', `Total: $${parseFloat(finalTotal).toFixed(2)}`);
     },
     onError: (err: any) => {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo registrar la venta');
@@ -332,6 +336,31 @@ export default function SellScreen() {
         </View>
       </Modal>
 
+      {/* Modal de éxito y Ticket */}
+      <Modal visible={showSuccess} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalBox, { alignItems: 'center', paddingVertical: Spacing.xl }]}>
+            <View style={s.successIcon}>
+              <Ionicons name="checkmark" size={40} color="#fff" />
+            </View>
+            <Text style={s.successTitle}>¡Venta Exitosa!</Text>
+            <Text style={s.successTotal}>Total: ${parseFloat(lastSale?.total || 0).toFixed(2)}</Text>
+            
+            <TouchableOpacity 
+              style={s.premiumTicketBtn} 
+              onPress={() => generatePremiumTicket(lastSale, business)}
+            >
+              <Ionicons name="share-social" size={20} color="#fff" />
+              <Text style={s.premiumTicketBtnText}>Compartir Ticket Premium</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={s.doneBtn} onPress={() => setShowSuccess(false)}>
+              <Text style={s.doneBtnText}>Listo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Scanner de código de barras */}
       <BarcodeScannerModal
         visible={showScanner}
@@ -430,4 +459,12 @@ const s = StyleSheet.create({
   cancelText:      { color: Colors.textSub, fontSize: FontSize.md },
   confirmBtn:      { flex: 2, backgroundColor: Colors.primary, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center', justifyContent: 'center' },
   confirmText:     { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  // Estilos de éxito
+  successIcon:  { width: 70, height: 70, borderRadius: 35, backgroundColor: Colors.success, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.md },
+  successTitle: { color: Colors.text, fontSize: FontSize.xl, fontWeight: '800', marginBottom: Spacing.xs },
+  successTotal: { color: Colors.textSub, fontSize: FontSize.lg, fontWeight: '600', marginBottom: Spacing.xl },
+  premiumTicketBtn: { backgroundColor: Colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderRadius: Radius.md, gap: Spacing.sm, marginBottom: Spacing.md },
+  premiumTicketBtnText: { color: '#fff', fontSize: FontSize.md, fontWeight: '700' },
+  doneBtn:      { padding: Spacing.md },
+  doneBtnText:  { color: Colors.textMuted, fontSize: FontSize.md, fontWeight: '600' },
 });

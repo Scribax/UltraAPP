@@ -24,7 +24,7 @@ const create = async (req, res, next) => {
 
     for (const item of data.items) {
       const prod = await client.query(
-        'SELECT id, name, sell_price, stock FROM products WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL FOR UPDATE',
+        'SELECT id, name, buy_price, sell_price, stock FROM products WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL FOR UPDATE',
         [item.product_id, req.business.id]
       );
       if (!prod.rows[0]) throw Object.assign(new Error(`Producto ${item.product_id} no existe`), { status: 404 });
@@ -33,7 +33,12 @@ const create = async (req, res, next) => {
       }
       const lineTotal = parseFloat(prod.rows[0].sell_price) * item.quantity;
       subtotal += lineTotal;
-      enrichedItems.push({ ...prod.rows[0], quantity: item.quantity, subtotal: lineTotal });
+      enrichedItems.push({ 
+        ...prod.rows[0], 
+        quantity: item.quantity, 
+        subtotal: lineTotal,
+        buy_price: prod.rows[0].buy_price 
+      });
     }
 
     const total = Math.max(0, subtotal - data.discount);
@@ -49,9 +54,9 @@ const create = async (req, res, next) => {
     // Insertar items + descontar stock + registrar movimiento
     for (const item of enrichedItems) {
       await client.query(
-        `INSERT INTO sale_items (sale_id, product_id, product_name, quantity, unit_price, subtotal)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [saleId, item.id, item.name, item.quantity, item.sell_price, item.subtotal]
+        `INSERT INTO sale_items (sale_id, product_id, product_name, quantity, buy_price, unit_price, subtotal)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [saleId, item.id, item.name, item.quantity, item.buy_price, item.sell_price, item.subtotal]
       );
       const stockBefore = item.stock;
       const stockAfter = item.stock - item.quantity;

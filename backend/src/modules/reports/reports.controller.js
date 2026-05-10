@@ -7,10 +7,13 @@ const dashboard = async (req, res, next) => {
     const bizId = req.business.id;
     const tz = 'America/Argentina/Buenos_Aires';
 
-    const [todaySales, lowStock, topProduct, weekSales] = await Promise.all([
-      // Ventas de hoy
+    const [todaySales, lowStock, topProduct, weekSales, monthFinancials] = await Promise.all([
+      // Ventas de hoy (incluyendo costo)
       db.query(
-        `SELECT COUNT(*) as count, COALESCE(SUM(total),0) as revenue
+        `SELECT 
+           COUNT(*) as count, 
+           COALESCE(SUM(total),0) as revenue,
+           COALESCE(SUM((SELECT SUM(buy_price * quantity) FROM sale_items WHERE sale_id = sales.id)),0) as cost
          FROM sales WHERE business_id = $1 AND status = 'completed'
          AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2
          AND created_at <  DATE_TRUNC('day', NOW() AT TIME ZONE $2) AT TIME ZONE $2 + INTERVAL '1 day'`,
@@ -40,10 +43,39 @@ const dashboard = async (req, res, next) => {
          GROUP BY day ORDER BY day`,
         [bizId]
       ),
+      // Resumen financiero del mes (Revenue, Cost, Expenses)
+      db.query(
+        `SELECT 
+          (SELECT COALESCE(SUM(total),0) FROM sales WHERE business_id = $1 AND status = 'completed' AND created_at >= DATE_TRUNC('month', NOW())) as month_revenue,
+          (SELECT COALESCE(SUM(si.buy_price * si.quantity),0) FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.business_id = $1 AND s.status = 'completed' AND s.created_at >= DATE_TRUNC('month', NOW())) as month_cost,
+          (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE business_id = $1 AND date >= DATE_TRUNC('month', NOW())) as month_expenses`,
+        [bizId]
+      )
     ]);
 
+    // Calcular hoy (gastos de hoy incluidos)
+    const todayExpenses = await db.query(
+      "SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE business_id = $1 AND date >= DATE_TRUNC('day', NOW())",
+      [bizId]
+    );
+
+    const fin = monthFinancials.rows[0];
+    const monthNet = parseFloat(fin.month_revenue) - parseFloat(fin.month_cost) - parseFloat(fin.month_expenses);
+
     res.json({
-      today: { count: parseInt(todaySales.rows[0]?.count || 0), revenue: parseFloat(todaySales.rows[0]?.revenue || 0) },
+      today: { 
+        count: parseInt(todaySales.rows[0]?.count || 0), 
+        revenue: parseFloat(todaySales.rows[0]?.revenue || 0),
+        cost: parseFloat(todaySales.rows[0]?.cost || 0),
+        expenses: parseFloat(todayExpenses.rows[0]?.total || 0),
+        profit: parseFloat(todaySales.rows[0]?.revenue || 0) - parseFloat(todaySales.rows[0]?.cost || 0) - parseFloat(todayExpenses.rows[0]?.total || 0)
+      },
+      month: {
+        revenue: parseFloat(fin.month_revenue),
+        cost: parseFloat(fin.month_cost),
+        expenses: parseFloat(fin.month_expenses),
+        net_profit: monthNet
+      },
       low_stock: lowStock.rows,
       top_product: topProduct.rows[0] || null,
       week_chart: weekSales.rows,

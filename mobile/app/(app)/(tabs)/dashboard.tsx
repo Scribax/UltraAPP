@@ -182,12 +182,36 @@ export default function DashboardScreen() {
         </View>
 
         {/* KPIs - Paso 1 */}
-        <Text style={s.sectionTitle}>📊 Hoy</Text>
+        <Text style={s.sectionTitle}>📊 Resumen Financiero</Text>
         <View ref={kpiRowRef}>
           <View style={s.kpiRow}>
-            <KpiCard label="Ingresos" value={formatMoney(data?.today?.revenue || 0)} icon="cash-outline" color={Colors.accent} />
-            <KpiCard label="Ventas" value={data?.today?.count ?? 0} icon="receipt-outline" color={Colors.primary} />
-            <KpiCard label="Ticket Prom." value={formatMoney(avgTicket)} icon="trending-up-outline" color={Colors.warning} />
+            <KpiCard label="Ventas Hoy" value={formatMoney(data?.today?.revenue || 0)} icon="cash-outline" color={Colors.accent} />
+            <KpiCard label="Gasto Hoy" value={formatMoney(data?.today?.expenses || 0)} icon="trending-down-outline" color={Colors.danger} />
+            <KpiCard label="Ganancia Hoy" value={formatMoney(data?.today?.profit || 0)} icon="diamond-outline" color={Colors.success} />
+          </View>
+        </View>
+
+        {/* Ganancia Mensual Card */}
+        <View style={s.monthlyCard}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+            <Text style={s.monthlyTitle}>📅 Este Mes (Neto)</Text>
+            <Text style={[s.monthlyNet, { color: (data?.month?.net_profit || 0) >= 0 ? Colors.success : Colors.danger }]}>
+              {formatMoney(data?.month?.net_profit || 0)}
+            </Text>
+          </View>
+          <View style={s.monthlyGrid}>
+            <View style={s.monthlyItem}>
+              <Text style={s.monthlyLabel}>Ingresos</Text>
+              <Text style={s.monthlyValue}>{formatMoney(data?.month?.revenue || 0)}</Text>
+            </View>
+            <View style={s.monthlyItem}>
+              <Text style={s.monthlyLabel}>Costos Prod.</Text>
+              <Text style={[s.monthlyValue, { color: Colors.danger }]}>-{formatMoney(data?.month?.cost || 0)}</Text>
+            </View>
+            <View style={s.monthlyItem}>
+              <Text style={s.monthlyLabel}>Gastos/Luz</Text>
+              <Text style={[s.monthlyValue, { color: Colors.danger }]}>-{formatMoney(data?.month?.expenses || 0)}</Text>
+            </View>
           </View>
         </View>
 
@@ -279,9 +303,16 @@ const s = StyleSheet.create({
   topName:      { color: Colors.text, fontSize: FontSize.md, fontWeight: '700' },
   topSold:      { color: Colors.warning, fontSize: FontSize.sm },
   lowStockCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.md, overflow: 'hidden' },
-  lowStockRow:  { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  lowStockName: { color: Colors.text, fontSize: FontSize.sm, marginBottom: 4 },
-  lowStockQty:  { fontSize: FontSize.sm, fontWeight: '700', minWidth: 44, textAlign: 'right' },
+  lowStockItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.xs, borderBottomWidth: 1, borderBottomColor: Colors.border + '33' },
+  lowStockName: { color: Colors.text, fontSize: 13 },
+  lowStockCount: { color: Colors.danger, fontSize: 13, fontWeight: '700' },
+  monthlyCard:  { backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.borderLight },
+  monthlyTitle: { color: Colors.textSub, fontSize: FontSize.sm, fontWeight: '600' },
+  monthlyNet:   { fontSize: FontSize.lg, fontWeight: '800' },
+  monthlyGrid:  { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm },
+  monthlyItem:  { },
+  monthlyLabel: { color: Colors.textMuted, fontSize: 10, textTransform: 'uppercase', marginBottom: 2 },
+  monthlyValue: { color: Colors.text, fontSize: 12, fontWeight: '700' },
   progressBg:   { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: 4, borderRadius: 2 },
   sellBtn:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.accent, borderRadius: Radius.lg, paddingVertical: Spacing.md + 4, gap: Spacing.sm, marginTop: Spacing.sm },
