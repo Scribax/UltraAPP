@@ -5,11 +5,13 @@ import { authAPI, businessAPI, subscriptionAPI } from '../services/api';
 interface User { id: string; name: string; email: string; }
 interface Business { id: string; name: string; slug: string; currency: string; }
 interface Subscription { plan: 'free'|'pro'; isPro: boolean; features: Record<string, any>; }
+interface Employee { id: string; name: string; role: 'owner'|'manager'|'cashier'; }
 
 interface AuthState {
   user: User | null;
   business: Business | null;
   subscription: Subscription | null;
+  activeEmployee: Employee | null;
   isLoading: boolean;
   isAuthenticated: boolean;
 
@@ -19,12 +21,16 @@ interface AuthState {
   selectBusiness: (b: Business) => Promise<void>;
   loadSession:    () => Promise<void>;
   refreshSub:     () => Promise<void>;
+  
+  employeeLogin:  (pin: string) => Promise<void>;
+  employeeLogout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   business: null,
   subscription: null,
+  activeEmployee: null,
   isLoading: true,
   isAuthenticated: false,
 
@@ -40,6 +46,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const { data: sub } = await subscriptionAPI.getCurrent();
         set({ subscription: sub });
       }
+      const empStr = await SecureStore.getItemAsync('active_employee');
+      if (empStr) set({ activeEmployee: JSON.parse(empStr) });
     } catch {
       await SecureStore.deleteItemAsync('access_token');
     } finally {
@@ -66,7 +74,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await SecureStore.deleteItemAsync('refresh_token');
     await SecureStore.deleteItemAsync('business_id');
     await SecureStore.deleteItemAsync('current_business');
-    set({ user: null, business: null, subscription: null, isAuthenticated: false });
+    await SecureStore.deleteItemAsync('active_employee');
+    set({ user: null, business: null, subscription: null, activeEmployee: null, isAuthenticated: false });
   },
 
   selectBusiness: async (b) => {
@@ -81,5 +90,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data } = await subscriptionAPI.getCurrent();
       set({ subscription: data });
     } catch {}
+  },
+
+  employeeLogin: async (pin: string) => {
+    const { employeesAPI } = require('../services/api');
+    const { data } = await employeesAPI.pinLogin(pin);
+    await SecureStore.setItemAsync('active_employee', JSON.stringify(data.employee));
+    set({ activeEmployee: data.employee });
+  },
+
+  employeeLogout: async () => {
+    await SecureStore.deleteItemAsync('active_employee');
+    set({ activeEmployee: null });
   },
 }));

@@ -7,8 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+import { generateZReport } from '../../../utils/zReportTicket';
 
 import { cashAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store/authStore';
@@ -90,83 +89,25 @@ export default function CashRegisterModal() {
 
   // ── Generación de PDF ───────────────────────────────────
   const generatePDF = async (reportData: any, realCash: number, expectedCash: number) => {
-    try {
-      const diff = realCash - expectedCash;
-      const diffColor = diff < 0 ? '#FF4D6A' : diff > 0 ? '#00D4AA' : '#5A5A8A';
-
-      // HTML Template
-      const htmlContent = `
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-            <style>
-              body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #1A1A2E; }
-              .header { text-align: center; border-bottom: 2px solid #6C63FF; padding-bottom: 15px; margin-bottom: 20px; }
-              .title { font-size: 28px; font-weight: 800; color: #6C63FF; margin: 0; }
-              .subtitle { font-size: 14px; color: #5A5A8A; margin-top: 5px; }
-              .card { background: #f8f9fc; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid #e1e4f0; }
-              .card-title { font-size: 14px; font-weight: 700; color: #1A1A2E; margin-top: 0; border-bottom: 1px solid #e1e4f0; padding-bottom: 8px; margin-bottom: 12px; }
-              .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-              .total-row { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 2px dashed #ccc; font-weight: 800; font-size: 16px; }
-              .chart-bar { height: 12px; border-radius: 6px; background: #eee; margin-top: 5px; overflow: hidden; display: flex; }
-              .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              .table th, .table td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 13px; }
-              .footer { text-align: center; margin-top: 40px; font-size: 11px; color: #A0A0C0; }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <h1 class="title">REPORTE DE TURNO</h1>
-              <div class="subtitle">${business?.name || 'Comercio'} - ${new Date().toLocaleDateString('es-AR')} ${new Date().toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'})}</div>
-            </div>
-
-            <div class="card">
-              <h3 class="card-title">💵 Cuadre de Caja (Efectivo)</h3>
-              <div class="row"><span>Esperado en caja:</span> <b>$${expectedCash.toFixed(2)}</b></div>
-              <div class="row"><span>Declarado físicamente:</span> <b>$${realCash.toFixed(2)}</b></div>
-              <div class="total-row"><span>Diferencia (Descuadre):</span> <span style="color: ${diffColor}">$${diff.toFixed(2)}</span></div>
-            </div>
-
-            <div class="card">
-              <h3 class="card-title">📊 Ventas por Método de Pago</h3>
-              ${reportData.sales.map((s: any) => `
-                <div class="row">
-                  <span style="text-transform: capitalize;">${s.payment_method} (${s.count} ventas)</span>
-                  <b>$${parseFloat(s.total).toFixed(2)}</b>
-                </div>
-              `).join('')}
-              ${reportData.sales.length === 0 ? '<div class="row">Sin ventas registradas.</div>' : ''}
-            </div>
-
-            <div class="card">
-              <h3 class="card-title">🏆 Top 5 Productos Vendidos</h3>
-              <table class="table">
-                <tr><th>Producto</th><th>Cant.</th><th style="text-align:right">Recaudado</th></tr>
-                ${reportData.topProducts.map((p: any) => `
-                  <tr>
-                    <td>${p.product_name}</td>
-                    <td>${p.qty}</td>
-                    <td style="text-align:right">$${parseFloat(p.revenue).toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-                ${reportData.topProducts.length === 0 ? '<tr><td colspan="3">No hay productos vendidos.</td></tr>' : ''}
-              </table>
-            </div>
-
-            <div class="footer">
-              Generado por <b>UltraAPP</b><br/>El sistema más rápido para tu negocio.
-            </div>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html: htmlContent });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf', dialogTitle: 'Reporte de Turno' });
-      }
-    } catch (err) {
-      Alert.alert('Error', 'No se pudo generar el PDF');
-    }
+    await generateZReport({
+      businessName: business?.name || 'Comercio',
+      date: new Date().toLocaleDateString('es-AR'),
+      startTime: new Date(reportData.startTime).toLocaleTimeString('es-AR'),
+      endTime: new Date().toLocaleTimeString('es-AR'),
+      expectedCash: expectedCash,
+      actualCash: realCash,
+      difference: realCash - expectedCash,
+      sales: reportData.sales.map((s: any) => ({
+        method: s.payment_method,
+        count: parseInt(s.count),
+        total: parseFloat(s.total)
+      })),
+      movements: reportData.movements.map((m: any) => ({
+        type: m.type,
+        amount: parseFloat(m.amount),
+        notes: m.notes
+      }))
+    });
   };
 
   // ── Render ──────────────────────────────────────────────

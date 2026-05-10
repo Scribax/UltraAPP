@@ -5,11 +5,16 @@ import { useAuthStore } from '../../../store/authStore';
 import { Colors, Spacing, Radius, FontSize } from '../../../constants/theme';
 
 export default function SettingsScreen() {
-  const { user, business, subscription, logout } = useAuthStore();
+  const { user, business, subscription, activeEmployee, employeeLogout, logout } = useAuthStore();
 
   const handleLogout = () => {
-    logout();
-    router.replace('/(auth)/login');
+    if (activeEmployee) {
+      employeeLogout();
+      router.replace('/(app)/(tabs)/dashboard');
+    } else {
+      logout();
+      router.replace('/(auth)/login');
+    }
   };
 
   return (
@@ -25,27 +30,31 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={s.content}>
         {/* Perfil */}
         <View style={s.profileCard}>
-          <View style={s.avatar}><Text style={{ fontSize: 24 }}>👤</Text></View>
+          <View style={s.avatar}><Text style={{ fontSize: 24 }}>{activeEmployee ? '🧑‍💼' : '👤'}</Text></View>
           <View style={{ flex: 1 }}>
-            <Text style={s.userName}>{user?.name}</Text>
-            <Text style={s.userEmail}>{user?.email}</Text>
+            <Text style={s.userName}>{activeEmployee ? activeEmployee.name : user?.name}</Text>
+            <Text style={s.userEmail}>{activeEmployee ? `Rol: ${activeEmployee.role.toUpperCase()}` : user?.email}</Text>
           </View>
         </View>
 
         {/* Negocio activo */}
-        <Text style={s.sectionTitle}>Negocio Activo</Text>
-        <View style={s.sectionBlock}>
-          <View style={s.row}>
-            <View style={s.rowIcon}><Ionicons name="storefront-outline" size={20} color={Colors.text} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.rowTitle}>{business?.name}</Text>
-              <Text style={s.rowSub}>Plan {subscription?.plan?.toUpperCase() || 'FREE'}</Text>
+        {!activeEmployee && (
+          <>
+            <Text style={s.sectionTitle}>Negocio Activo</Text>
+            <View style={s.sectionBlock}>
+              <View style={s.row}>
+                <View style={s.rowIcon}><Ionicons name="storefront-outline" size={20} color={Colors.text} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowTitle}>{business?.name}</Text>
+                  <Text style={s.rowSub}>Plan {subscription?.plan?.toUpperCase() || 'FREE'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push('/(auth)/select-business')}>
+                  <Text style={s.switchText}>Cambiar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => router.push('/(auth)/select-business')}>
-              <Text style={s.switchText}>Cambiar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          </>
+        )}
 
         {/* Preferencias */}
         <Text style={s.sectionTitle}>Preferencias</Text>
@@ -62,12 +71,19 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* Peligro */}
-        <Text style={s.sectionTitle}>Cuenta</Text>
+        {/* Peligro / Sesión */}
+        <Text style={s.sectionTitle}>{activeEmployee ? 'Turno' : 'Cuenta y Seguridad'}</Text>
         <View style={s.sectionBlock}>
+          {!activeEmployee && (
+            <TouchableOpacity style={[s.row, s.borderBottom]} onPress={() => router.push('/(auth)/pin-login')}>
+              <View style={[s.rowIcon, { backgroundColor: Colors.accent + '22' }]}><Ionicons name="keypad-outline" size={20} color={Colors.accent} /></View>
+              <Text style={s.rowTitle}>Entrar como Empleado (PIN)</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity style={s.row} onPress={handleLogout}>
             <View style={[s.rowIcon, { backgroundColor: Colors.danger + '22' }]}><Ionicons name="log-out-outline" size={20} color={Colors.danger} /></View>
-            <Text style={[s.rowTitle, { color: Colors.danger }]}>Cerrar sesión</Text>
+            <Text style={[s.rowTitle, { color: Colors.danger }]}>{activeEmployee ? 'Terminar Turno (Salir)' : 'Cerrar sesión (Dueño)'}</Text>
           </TouchableOpacity>
         </View>
         

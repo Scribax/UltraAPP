@@ -153,13 +153,34 @@ const exportExcel = async (req, res, next) => {
     }));
 
     const wb = xlsx.utils.book_new();
-    const ws = xlsx.utils.json_to_sheet(data);
-    xlsx.utils.book_append_sheet(wb, ws, 'Ventas');
+    
+    // Hoja de Ventas
+    const wsSales = xlsx.utils.json_to_sheet(data);
+    xlsx.utils.book_append_sheet(wb, wsSales, 'Ventas');
+
+    // Hoja de Gastos
+    const expenses = await db.query(
+      `SELECT date, category, amount, description FROM expenses 
+       WHERE business_id = $1 AND date >= $2 AND date <= $3 ORDER BY date DESC`,
+      [req.business.id, from || '2000-01-01', to ? to + 'T23:59:59' : '2099-12-31']
+    );
+    
+    if (expenses.rows.length > 0) {
+      const expensesData = expenses.rows.map(e => ({
+        Fecha: new Date(e.date).toLocaleDateString('es-AR'),
+        Categoría: e.category,
+        Descripción: e.description,
+        Monto: parseFloat(e.amount)
+      }));
+      const wsExpenses = xlsx.utils.json_to_sheet(expensesData);
+      xlsx.utils.book_append_sheet(wb, wsExpenses, 'Gastos');
+    }
+
     const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="ventas-${req.business.id}.xlsx"`,
+      'Content-Disposition': `attachment; filename="reporte-financiero-${req.business.id}.xlsx"`,
     });
     res.send(buffer);
   } catch (err) { next(err); }

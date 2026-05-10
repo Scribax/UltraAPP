@@ -7,6 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { reportsAPI } from '../../../services/api';
 import { useAuthStore } from '../../../store/authStore';
 import { usePlan } from '../../../hooks/usePlan';
@@ -74,10 +76,27 @@ export default function StatsScreen() {
   const handleExport = () => {
     requirePro('export_excel', async () => {
       try {
-        Alert.alert('Exportando...', 'El archivo Excel se descargará en breve');
-        // En producción: descargar con expo-file-system + expo-sharing
-      } catch {
-        Alert.alert('Error', 'No se pudo exportar');
+        Alert.alert('Exportando...', 'Generando archivo Excel...');
+        // Convertir el Blob de Axios a Base64 para guardarlo
+        const response = await reportsAPI.exportExcel();
+        const reader = new FileReader();
+        reader.readAsDataURL(response.data);
+        reader.onloadend = async () => {
+          const base64data = (reader.result as string).split(',')[1];
+          const fileUri = FileSystem.documentDirectory + `reporte-financiero-${business?.name.replace(/\\s/g, '-')}.xlsx`;
+          
+          await FileSystem.writeAsStringAsync(fileUri, base64data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', dialogTitle: 'Reporte Financiero Excel' });
+          } else {
+            Alert.alert('Éxito', 'Reporte guardado en el dispositivo.');
+          }
+        };
+      } catch (err) {
+        Alert.alert('Error', 'No se pudo generar el Excel');
       }
     });
   };

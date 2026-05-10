@@ -2,9 +2,12 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/theme';
 import { useCartStore } from '../../../store/cartStore';
+import { useAuthStore } from '../../../store/authStore';
 
 export default function TabsLayout() {
   const cartCount = useCartStore(s => s.getItemCount());
+  const activeEmployee = useAuthStore(s => s.activeEmployee);
+  const isCashier = activeEmployee?.role === 'cashier';
 
   return (
     <Tabs
@@ -27,6 +30,7 @@ export default function TabsLayout() {
         name="dashboard"
         options={{
           title: 'Inicio',
+          href: isCashier ? null : undefined,
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
@@ -68,6 +72,7 @@ export default function TabsLayout() {
         name="stats"
         options={{
           title: 'Estadísticas',
+          href: isCashier ? null : undefined,
           tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart-outline" size={size} color={color} />,
         }}
       />
