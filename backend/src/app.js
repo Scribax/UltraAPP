@@ -32,7 +32,7 @@ app.use(cors({
 }));
 
 // ── Rate Limiting con Redis (Performance Enterprise) ────────
-const RedisStore = require('rate-limit-redis');
+const { RedisStore } = require('rate-limit-redis');
 const redisClient = require('./config/redis');
 
 const globalLimiter = rateLimit({
