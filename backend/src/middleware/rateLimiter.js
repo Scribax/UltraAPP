@@ -1,21 +1,23 @@
-const { rateLimit } = require('express-rate-limit');
+const rateLimit = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
-const { redis } = require('../config/redis');
+const redisClient = require('../config/redis');
 
-/**
- * Rate limiter usando Redis como store
- * Persiste los contadores entre reinicios del servidor
- */
-const redisRateLimiter = (windowMs, max, message) =>
-  rateLimit({
-    windowMs,
-    max,
-    message: { error: message || 'Demasiadas solicitudes, intenta más tarde' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    store: new RedisStore({
-      sendCommand: (...args) => redis.sendCommand(args),
-    }),
-  });
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  message: { error: 'Demasiadas solicitudes' },
+  store: new RedisStore({
+    sendCommand: (...args) => redisClient.sendCommand(args),
+  }),
+});
 
-module.exports = redisRateLimiter;
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // Para login/register
+  message: { error: 'Demasiados intentos de autenticación' },
+  store: new RedisStore({
+    sendCommand: (...args) => redisClient.sendCommand(args),
+  }),
+});
+
+module.exports = { globalLimiter, authLimiter };

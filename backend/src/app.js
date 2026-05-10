@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+const { globalLimiter } = require('./middleware/rateLimiter');
 
 // ── Módulos ────────────────────────────────────────────────
 const authRoutes         = require('./modules/auth/auth.routes');
@@ -32,30 +32,6 @@ app.use(cors({
   credentials: true,
 }));
 
-// ── Rate Limiting con Redis (Performance Enterprise) ────────
-const { RedisStore } = require('rate-limit-redis');
-const redisClient = require('./config/redis');
-
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 300,
-  message: { error: 'Demasiadas solicitudes' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-  }),
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  message: { error: 'Demasiados intentos de autenticación' },
-  store: new RedisStore({
-    sendCommand: (...args) => redisClient.sendCommand(args),
-  }),
-});
-
 app.use(globalLimiter);
 
 // ── Body parsing ───────────────────────────────────────────
@@ -83,7 +59,7 @@ app.get('/health', async (req, res) => {
 });
 
 // ── Rutas API ──────────────────────────────────────────────
-app.use('/api/auth',         authLimiter, authRoutes);
+app.use('/api/auth',         authRoutes);
 app.use('/api/business',     businessRoutes);
 app.use('/api/products',     productRoutes);
 app.use('/api/sales',        salesRoutes);
