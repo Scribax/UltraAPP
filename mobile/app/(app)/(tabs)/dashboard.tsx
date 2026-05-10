@@ -169,6 +169,9 @@ export default function DashboardScreen() {
             <Text style={s.bizName}>{business?.name}</Text>
           </View>
           <View style={s.headerActions}>
+            <TouchableOpacity onPress={() => router.push('/(app)/modals/cash-register')} style={s.actionBtn}>
+              <Ionicons name="cash-outline" size={24} color={Colors.success} />
+            </TouchableOpacity>
             <TouchableOpacity onPress={startTour} style={s.actionBtn}>
               <Ionicons name="school-outline" size={22} color={Colors.accent} />
             </TouchableOpacity>

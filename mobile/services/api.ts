@@ -100,3 +100,9 @@ export const employeesAPI = {
 export const subscriptionAPI = {
   getCurrent: () => api.get('/subscription'),
 };
+
+export const cashAPI = {
+  register: (data: any) => api.post('/cash', data),
+  getStatus: () => api.get('/cash/status'),
+  getShiftReport: () => api.get('/cash/shift-report'),
+};

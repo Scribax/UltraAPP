@@ -13,6 +13,7 @@ const reportRoutes       = require('./modules/reports/reports.routes');
 const categoryRoutes     = require('./modules/categories/categories.routes');
 const employeeRoutes     = require('./modules/employees/employees.routes');
 const subscriptionRoutes = require('./modules/subscriptions/subscriptions.routes');
+const cashRoutes         = require('./modules/cash/cash.routes');
 const errorHandler       = require('./middleware/errorHandler');
 
 const app = express();
@@ -80,6 +81,7 @@ app.use('/api/reports',      reportRoutes);
 app.use('/api/categories',   categoryRoutes);
 app.use('/api/employees',    employeeRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/cash',         cashRoutes);
 
 // ── 404 ────────────────────────────────────────────────────
 app.use((req, res) => {
