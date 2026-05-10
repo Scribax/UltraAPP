@@ -257,6 +257,7 @@ export default function SellScreen() {
           <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing.lg }} />
         ) : (
           <FlatList
+            key="1col"
             data={products || []}
             keyExtractor={p => p.id}
             numColumns={1}
