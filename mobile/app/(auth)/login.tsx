@@ -24,7 +24,9 @@ export default function LoginScreen() {
       await login(email.trim().toLowerCase(), password);
       router.replace('/');
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'Credenciales incorrectas');
+      console.error(err);
+      const msg = err.response?.data?.error || err.message || 'Error desconocido';
+      Alert.alert('Error', `${msg} (${err.response?.status || 'Net'})`);
     } finally {
       setLoading(false);
     }
